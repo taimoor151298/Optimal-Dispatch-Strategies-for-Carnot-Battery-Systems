@@ -1,95 +1,32 @@
+import cvxpy.atoms
 import pandas as pd
 import json
 import numpy as np
 from cvxpy import *
 import matplotlib.pyplot as plt
-import gurobipy
-import matlab
-import matlab.engine as me
 
-
-
-#from cplex import *
-#from cylp import *
 
 ### Reading PV power and converting it into W. Size is set to 2MW
+
 df1 = pd.read_csv('PV_power.csv')
-#print(df1.head(24))
 PV_power = df1['System power generated | (kW)']/1000
-#print(PV_power[0:48])
+print('done 1')
 
 ### Reading wind power. System size is set to 2MW
 df2 = pd.read_csv('Wind_power.csv')
-#print(df2.head(24))
 Wind_power = df2['System power generated | (kW)']/1000
-#print(Wind_power[0:48])
+print('done 2')
 
 ### Reading the load profile
 
-#df3 = pd.read_json('v_opendata.json', orient = 'records')
-#json_data = df3['data'][0]
-#power_list = []
 
 df4 = pd.read_excel('2021_ElectricityPrice.xlsx', sheet_name= 'Database', skiprows= range(3))
 df4 = df4[['day', 'DE-LU']]
-#print(df4.head())
-#with open('temp.txt','w') as f1:
-#    f1.write(str(json_data[0][0]))
-#for i in range(len(json_data)):
-#    total_list.append(json_data[i])
-#for i in range(len(json_data)):
-#    print(json_data[i]['internal_id_1'])
+print('done 3')
 
-# Extracting only the sum values for load across all 3 phases
-#power_list.extend(item for item in json_data if item['internal_id_2'] == 0)
-#power_array = np.array([power_list[i]['values'] for i in range(len(power_list))])
-#Averaging every 15 minutes
-'''
-power_15min = []
-for i in range(len(power_array)):
-   # print(i)
-    power_15min.extend([np.mean(power_array[i].reshape(-1,15), axis = 1)])
-#power_15min.extend(np.mean(np.mean(power_array[i].reshape(-1,15), axis = 1)) for i in range(len(power_array)))
-print(np.shape(power_15min))
-power_15min_step = np.repeat(power_15min,15, axis = 1)
-print(np.shape(power_15min_step))
-num_min = 24*60
-power_1hr_step = np.reapeat
-for i in range(np.shape(power_15min_step)[0]):
-    plt.plot(power_15min_step[i][0:num_min])
-plt.show()
-'''
-#load_1hr = []
-#for i in range(len(power_array)):
-   # print(i)
-#    load_1hr.extend([np.mean(power_array[i].reshape(-1,60), axis = 1)])
-#power_15min.extend(np.mean(np.mean(power_array[i].reshape(-1,15), axis = 1)) for i in range(len(power_array)))
-#print(np.shape(power_15min))
-#repeating the average for 60 minutes and converting to W
-#load_1hr_step = np.repeat(load_1hr,60, axis = 1)
-
-#converting kW to W
-#load_1hr = np.divide(load_1hr,1000)
-#np.savetxt('Load.csv', load_1hr, delimiter = ',')
-#print(np.shape(load_1hr_step))
-load_1hr = pd.read_csv('Load.csv')
+load_1hr = pd.read_csv('Load.csv', header = None)
 print(load_1hr.head())
-#num_min = 2*24*60
-#for i in range(np.shape(load_1hr_step)[0]):
-#    plt.plot(load_1hr_step[i][0:num_min])
-#plt.show()
-#print(check_list[0]['values'])
-#print(id_list)
-#print(len(check_list))
-#print(json_data[:], file = f1)
-#for i in range(len(df3['data'])):
-#    print('ye check kro {}'.format(i))
-#    print(type(df3['data']))
-#    print(df3['data'][i], file = f1)
-    #print(i, file = f1)
-#print(df3['data'], file =f1)
-
-
+print('done 4')
 #Wind cost is 0.0175 euro / kWh based on IRENA 2010 data
 #https://www.irena.org/-/media/Files/IRENA/Agency/Publication
 # /2012/RE_Technologies_Cost_Analysis-WIND_POWER.pdf
@@ -100,8 +37,9 @@ grid_opcost = 100 #euro/Wh
 export_opcost = 10 #euro/Wh
 
 print('Hello ji 2',len(PV_power)/365)
-length = int(2*len(PV_power)/365)
+length = int(364*len(PV_power)/365)
 grid_price = df4[0:length]['DE-LU']
+print(len(grid_price))
 power_fromPV = Variable(length, nonneg=True)
 power_frombattery = Variable(length, nonneg = True)
 power_tobattery = Variable(length, nonneg = True)
@@ -110,8 +48,14 @@ power_toGrid = Variable(length, nonneg = True)
 power_fromgrid = Variable(length, nonneg = True)
 import_switch = Variable(length, boolean= True)
 export_switch = Variable(length, boolean = True)
-SOC = Variable(length, nonneg = True)
+SOC = Variable(length, nonneg= True)
 mass_flow = Variable(length, nonneg = True)
+step_efficiency = Variable(length, nonneg = True)
+l1 = Variable(length, boolean= True)
+#l2 = Variable(length, boolean = True)
+#l3 = Variable(length, boolean = True)
+product = Variable(length, nonneg= True)
+
 
 SOC_ini = 0.9
 SOC_max = 0.9
@@ -121,90 +65,152 @@ battery_capacity = 30
 
 #objective = Minimize(sum(PV_opcost*power_fromPV + power_frombattery*Steam_opcost + power_fromWind*Wind_opcost))
 constraints = []
-print('the size is {}'.format(len(PV_power)))
+print('the size is {}'.format(len(load_1hr)))
 
 
-print("hello ji",len(load_1hr[0][0:length]))
-initial_temp = []
-initial_temp.extend([293,293])
+print("hello ji",(load_1hr[0][0:length]))
+#initial_temp = []
+#initial_temp.extend([293,293])
 cost = 0
-eng = me.start_matlab()
-s = eng.genpath("C:/Users/taimo/OneDrive - Universite de Lorraine\Bureau\DENSYS\Master Thesis\Thesis Work\Python Code")
-eng.addpath(s, nargout=0)
+#eng = me.start_matlab()
+#s = eng.genpath("C:/Users/taimo/OneDrive - Universite de Lorraine/Bureau/DENSYS/Master Thesis/Thesis Work/Python Code/PDE Solution")
+#eng.addpath(s, nargout=0)
 
 #battery parameters
-ca = 1100;
-heater_eff = 0.9
+ca = 1100
+heater_eff = 0.95
 T_in = 750+273
 T_inf = 9.8+273
-Pmax_fromheater = 5.4e6
-m_flow_max = Pmax_fromheater/(ca*heater_eff*(T_in - T_inf))
+Pmax_toheater = 5.4e6
+m_flow_max = Pmax_toheater/(ca*heater_eff*(T_in - T_inf))
+print(m_flow_max)
 #m_flow = power_fromheater/(ca*heater_eff*(T_in - T_inf));
-
-
+#efficiency = pd.read_csv('efficiency.csv', header = None)
+#efficiency.columns = ['SOC', 'efficiency']
+#print(efficiency.head())
 
 for t in range(length):
-
-    cost += grid_price[t]*(power_fromgrid[t] ) + PV_opcost * power_fromPV[t] + power_frombattery[t] * Steam_opcost + \
-            power_fromWind[t] * Wind_opcost - 0.10*power_toGrid[t]*grid_price[t]
+    #g = (step_efficiency[t] >= power(SOC[t-1], 3)).is_dcp()
+    #print(g)
+    #print((-1.234*power(SOC[t-1],3)).is_concave())
+    #print((-1.234 * power(SOC[t-1],3) >= step_efficiency[t]).is_dcp())
+    cost += grid_price[t]*(power_fromgrid[t]) + PV_opcost * power_fromPV[t] + power_frombattery[t] * Steam_opcost + \
+            power_fromWind[t] * Wind_opcost - power_toGrid[t]*grid_price[t]
+    #cost += step_efficiency[t]
     constraints += [power_fromPV[t] == PV_power[t]]
     constraints += [power_fromgrid[t] + power_fromPV[t] + power_frombattery[t] + power_fromWind[t] == load_1hr[0][t]*1000 + power_toGrid[t] + power_tobattery[t]]
     constraints += [power_fromWind[t] == Wind_power[t]]
-    constraints += [power_toGrid[t] <= 1]
+    constraints += [power_frombattery[t] <= 1.4]
+
 
     #Charging Constraints for Battery
-    constraints += [mass_flow[t] == power_tobattery[t]*1e6 / (ca * heater_eff * (T_in - T_inf))]
-    constraints += [mass_flow[t] <= m_flow_max]
-    print('hello ji', matlab.double(power_tobattery[t]))
-    SOC[t], mass_flow, temp_fromMAT = eng.Charger(matlab.double(power_tobattery[t].value), [293, 293])
 
+    constraints += [SOC[t] >= 0.4988 - 10 * (1 - l1[t])]
+    constraints += [SOC[t] <= 0.4988 + 10 * l1[t]]
 
-    #constraints += [import_switch[t] + export_switch[t] == 1]
-
+    constraints += [product[t] >= 0.47853 * power_tobattery[t], product[t] <= 0.6238 * power_tobattery[t]]
+    constraints += [product[t] >= 5.4 * step_efficiency[t] + 0.6238 * power_tobattery[t] - 3.36852]
+    constraints += [product[t] <= 5.4 * step_efficiency[t] + 0.47853 * power_tobattery[t] - 2.584062]
+    constraints += [SOC[t] <= SOC_max, SOC[t]>= SOC_min]
     if (t==0):
-        constraints += [SOC[t] == SOC_ini + (power_tobattery[t] - power_frombattery[t])/battery_capacity]
-        constraints += [power_tobattery[t] <= (SOC_max - SOC_ini)*battery_capacity]
-        constraints += [power_frombattery[t] <= (SOC_ini - SOC_min)*battery_capacity]
+
+        #constraints += [SOC[t] == SOC_ini + power_tobattery[t]/battery_capacity - power_frombattery[t]/battery_capacity]
+        if (SOC_ini <= 4988):
+            constraints += [step_efficiency[t] == 0.6037]
+        else:
+         constraints += [step_efficiency[t] == -0.3623*SOC_ini + 0.8046]
+        #constraints += [product[t] == -1.97046 * SOC_ini + 0.65313 * power_tobattery[t] + 0.591138]
+        constraints += [SOC[t] == SOC_ini + product[t] / battery_capacity - power_frombattery[t] / (0.4*battery_capacity)]
+        #constraints += [product[t] <= (SOC_max - SOC_ini)*battery_capacity]
+        #constraints += [power_frombattery[t]/0.4 <= (SOC_ini - SOC_min)*battery_capacity]
+
+
     else:
-        constraints += [SOC[t] == SOC[t-1] + (power_tobattery[t] - power_frombattery[t])/battery_capacity]
-        constraints += [power_tobattery[t] <= (SOC_max - SOC[t-1]) * battery_capacity]
-        constraints += [power_frombattery[t] <= (SOC[t-1] - SOC_min) * battery_capacity]
-
-    #constraints += [SOC[t] <= 0.9 , SOC[t] >= 0.1]
 
 
+        constraints += [SOC[t] == SOC[t - 1] + product[t] / battery_capacity - power_frombattery[t]/(0.4 * battery_capacity)]
+        constraints += [step_efficiency[t] <= -0.3623*SOC[t-1] + 0.8046 + 10*(1-l1[t])]
+        constraints += [step_efficiency[t] >= -0.3623 * SOC[t - 1] + 0.8046 - 10 * (1 - l1[t])]
+        constraints += [step_efficiency[t] <= 0.6037 + 10 * l1[t]]
+        constraints += [step_efficiency[t] >= 0.6037 - 10 * l1[t]]
 
+       # constraints += [SOC[t] == SOC[t - 1] + power_tobattery[t] / battery_capacity -  power_frombattery[t] / battery_capacity]
+        #constraints += [product[t] <= (SOC_max - SOC[t-1]) * battery_capacity]
+        #constraints += [power_frombattery[t]/0.4 <= (SOC[t-1] - SOC_min) * battery_capacity]
 
-#SOC = Parameter(length, nonneg=True)
-#SOC = np.zeros(length + 1)
-#for i in range(length):
-#    if (i==0):
-#        constraints += [SOC[i] == SOC_ini]
-#    else:
-#        constraints += [SOC[i] == (SOC[i-1] + power_frombattery/battery_capacity)]
 
 #constraints = [constraint_Wind,constraint_Wind2, constraint_equality, constraint_PV, constraint_PV2]
 simple_model = Problem(Minimize(cost), constraints)
+
+
 simple_model.solve(solver = GUROBI, verbose = True)
 print(installed_solvers())
 solution_matrix = []
 print('ye type he', type(power_fromPV))
 plt.figure(1)
-plt.plot(power_fromPV.value)
-plt.plot(power_frombattery.value)
-plt.plot(power_fromWind.value)
-plt.plot(power_fromgrid.value)
-plt.plot(-power_tobattery.value)
-plt.plot(-power_toGrid.value)
-plt.plot(load_1hr[0][0:length]*1000)
+x = np.linspace(0,length-1,length)
+#print(x)
+hello_ji = power_fromPV.value
+#print(type(hello_ji))
+plt.step(x,power_fromPV.value)
+plt.step(x,power_frombattery.value)
+plt.step(x,power_fromWind.value)
+plt.step(x,power_fromgrid.value)
+plt.step(x,-power_tobattery.value)
+plt.step(x,-power_toGrid.value)
+plt.step(x,load_1hr[0][0:length]*1000)
 plt.legend(["PV", "From Battery", "Wind", "From Grid", "To Battery", "To Grid", "Load" ])
 
 plt.figure(2)
-plt.plot(SOC.value)
+plt.step(x,SOC.value)
 
 
-plt.figure(3)
-plt.plot(mass_flow.value)
+#plt.figure(3)
+#plt.step(x,mass_flow.value)
+
+
+plt.figure(4)
+plt.step(x,step_efficiency.value)
+#plt.step(x, product.value/power_tobattery.value)
+
+plt.figure(5)
+plt.subplot(1,3,1)
+plt.step(x, SOC.value, 'r')
+plt.ylim([0, 1])
+
+plt.title('SOC with approximated product')
+
+plt.subplot(1,3,2)
+
+SOC_original = np.zeros(length)
+for t in range(length):
+    if(t==0):
+        print('in loop', step_efficiency[t].value)
+        SOC_original[t] = SOC_ini + step_efficiency[t].value*power_tobattery[t].value/battery_capacity - power_frombattery[t].value  \
+                          /(0.4*battery_capacity)
+    else:
+        #print('again in loop',step_efficiency[t].value*power_tobattery[t].value )
+        SOC_original[t] = SOC_original[t-1] + step_efficiency[t].value*power_tobattery[t].value /battery_capacity - power_frombattery[t].value\
+                          /(0.4*battery_capacity)
+
+plt.step(x, SOC_original, 'g')
+plt.ylim([0, 1])
+plt.title('SOC with actual product')
+
+plt.subplot(1,3,3)
+
+SOC_approx = np.around(SOC.value, decimals = 2)
+SOC_original = np.around(SOC_original, decimals =2 )
+#print('actual product', original)
+#print('approx product', product.value)
+#temp_array = np.around(np.array(product.value), decimals = 2)
+
+
+error = np.abs(np.divide(SOC_original - SOC_approx,SOC_original ,
+              out=np.zeros_like(SOC_original - SOC_approx),  where = SOC_original!=0))*100
+plt.step(x, error, 'g')
+plt.title('Error')
+
 plt.show()
 #plt.figure(2)
 #plt.plot(SOC.value)
