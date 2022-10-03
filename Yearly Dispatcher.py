@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 ### Reading PV power and converting it into W. Size is set to 2MW
 
-PV_capacity = 4  #MW
+PV_capacity =  6 #MW
 PV_opcost = 17 * 1e3 * 0.93  # euro/MW-year
 df1 = pd.read_csv('PV_power.csv')
 PV_power = PV_capacity*np.array(df1['System power generated | (kW)']/1000)/0.2
@@ -15,7 +15,7 @@ print('PV Power Profile Loaded')
 
 ### Reading wind power. System size is set to 2MW
 df2 = pd.read_csv('Wind_power.csv')
-Wind_power = 2*np.array(df2['System power generated | (kW)']/1000)
+Wind_power = 3*np.array(df2['System power generated | (kW)']/1000)
 print('Wind Power Profile Loaded')
 
 ### Reading the load profile
@@ -30,7 +30,7 @@ load_profile = np.array(1000*(pd.read_csv('Load.csv', header = None)[0]))
 print('Load Profile Loaded')
 
 n_days = 7
-n_steps = 52
+n_steps = 1
 
 hours = int(n_steps*n_days*24)
 
@@ -73,20 +73,86 @@ plt.figure(1)
 
 
 starting_hour = 0
-ending_hour = n_days*n_steps*24
+#ending_hour = n_days*n_steps*24
+ending_hour = 48
 x = np.linspace(starting_hour,ending_hour-1,ending_hour)
 plt.legend(["PV", "From Battery", "Wind", "From Grid", "To Battery", "To Grid", "Load" ])
 
+plt.subplot(1,2,1)
 plt.step(x,power_fromPV[starting_hour:ending_hour])
-plt.step(x,power_frombattery[starting_hour:ending_hour])
-plt.step(x,power_fromWind[starting_hour:ending_hour])
-plt.step(x,power_fromgrid[starting_hour:ending_hour])
-plt.step(x,-power_tobattery[starting_hour:ending_hour])
-plt.step(x,-power_toGrid[starting_hour:ending_hour])
-plt.step(x,load_profile[starting_hour:ending_hour])
-plt.legend(["PV", "From Battery", "Wind", "From Grid", "To Battery", "To Grid", "Load" ])
+plt.step(x, power_fromWind[starting_hour:ending_hour])
+plt.step(x, power_frombattery[starting_hour:ending_hour])
+plt.step(x, power_fromgrid[starting_hour:ending_hour])
+plt.title('Total Power Supply')
 plt.xlabel('Time (hours)')
 plt.ylabel('Power (MW)')
+plt.legend(["PV",  "Wind", "From Battery", "From Grid"])
+plt.ylim(0,3)
+plt.subplot(1,2,2)
+plt.step(x,power_tobattery[starting_hour:ending_hour])
+plt.step(x,power_toGrid[starting_hour:ending_hour])
+plt.step(x,load_profile[starting_hour:ending_hour])
+plt.xlabel('Time (hours)')
+plt.ylabel('Power (MW)')
+plt.title('Total Power Demand')
+plt.legend([ "To Battery", "To Grid", "Load" ])
+plt.ylim(0,3)
+
+starting_hour = 0
+#ending_hour = n_days*n_steps*24
+ending_hour = 48
+temp = np.linspace(starting_hour,(ending_hour-1),60*ending_hour)
+plt.figure(6)
+plt.subplot(1,2,1)
+plt.stackplot(temp,np.repeat(power_fromPV[starting_hour:ending_hour],60), np.repeat(power_fromWind[starting_hour:ending_hour],60),
+              np.repeat(power_frombattery[starting_hour:ending_hour],60), np.repeat(power_fromgrid[starting_hour:ending_hour],60),
+              labels=["PV",  "Wind", "From Battery", "From Grid"])
+plt.xlabel('Time (hours)')
+plt.ylabel('Power (MW)')
+plt.title('Total Power Production')
+plt.legend(["PV",  "Wind", "From Battery", "From Grid"])
+plt.xlim(0,50)
+plt.ylim(0,3)
+
+plt.subplot(1,2,2)
+plt.stackplot(temp,np.repeat(power_tobattery[starting_hour:ending_hour],60), np.repeat(power_toGrid[starting_hour:ending_hour],60), np.repeat(load_profile[starting_hour:ending_hour],60),
+              labels=['To Battery','To Grid','Load Profile'])
+plt.xlabel('Time (hours)')
+plt.ylabel('Power (MW)')
+plt.title('Total Power Demand')
+plt.legend(['To Battery','To Grid','Load Profile'])
+plt.xlim(0,50)
+plt.ylim(0,3)
+
+#plt.subplot(3,3,2)
+#plt.step(x,power_fromWind[starting_hour:ending_hour])
+#plt.xlabel('Time (hours)')
+#plt.ylabel('Power (MW)')
+#plt.title('Wind Production')
+#plt.subplot(3,3,6)
+#plt.step(x,power_fromgrid[starting_hour:ending_hour])
+#plt.xlabel('Time (hours)')
+#plt.ylabel('Power (MW)')
+#plt.title('Grid Import')
+#plt.subplot(3,3,5)
+#plt.step(x,power_tobattery[starting_hour:ending_hour])
+#plt.title('Charging Power for Battery')
+#plt.xlabel('Time (hours)')
+#plt.ylabel('Power (MW)')
+#plt.subplot(3,3,8)
+#plt.step(x,power_toGrid[starting_hour:ending_hour])
+#plt.xlabel('Time (hours)')
+#plt.ylabel('Power (MW)')
+#plt.title('Grid Export')
+#plt.subplot(3,3,3)
+#plt.step(x,load_profile[starting_hour:ending_hour])
+#plt.xlabel('Time (hours)')
+#plt.ylabel('Power (MW)')
+#plt.title('Load Profile')
+
+#plt.legend(["PV", "From Battery", "Wind", "From Grid", "To Battery", "To Grid", "Load" ])
+#plt.xlabel('Time (hours)')
+#plt.ylabel('Power (MW)')
 plt.figure(2)
 plt.step(x,SOC[starting_hour:ending_hour])
 
@@ -160,12 +226,12 @@ final_df = final_df.T
 final_df.index = np.arange(1, len(final_df)+1)
 final_df.loc['Column_Total']= final_df.sum(numeric_only=True, axis=0)
 final_df.columns = ['PV', 'Wind', 'From Grid', 'To Grid', 'From Battery', 'To Battery', 'Grid Price', 'Load Profile', 'Efficiency', 'SOC']
-final_df.to_csv('MinGrid_8MW.csv')
+final_df.to_csv('60MinOPEX_20MW.csv')
 
 
 
 print(sum(power_frombattery))
 print(sum(power_fromWind))
-print(np.dot(power_fromgrid, grid_price[starting_hour:ending_hour]))
+#print(np.dot(power_fromgrid, grid_price[starting_hour:ending_hour]))
 print(sum(power_fromPV))
 plt.show()

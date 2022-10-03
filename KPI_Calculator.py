@@ -3,7 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-result = pd.read_csv('MinGrid_8MW.csv', index_col = [0], skipfooter =1)
+result = pd.read_csv('LiMinOPEX_20MW.csv', index_col = [0], skipfooter =1)
+Wind_capacity = 10
+PV_capacity = 10  # in MW
 print(result.head())
 print(result.tail())
 Volume = 84.9492
@@ -28,19 +30,21 @@ V_ins2 = np.pi*H*(R4**2 - R3**2)
 print(V_in1, V_steel)
 
 CAPEX_Li = 564*0.93*1e3   #Euro/MWh
-Size_Li = 8.4 #MWh
+Size_Li = 10 #MWh
 CAPEX_battery = CAPEX_Li*Size_Li
 #CAPEX_battery = 0.93 * (66 * Volume + 4269 * V_in1 + 616 * V_ins2 + 42354 * V_steel + 1210 * Area + 12000)
-print('CAPEX is',CAPEX_battery)
+
 
 OPEX_cycle = 35  # Euro/MWh
 #OPEX_battery = 0.02 * CAPEX_battery + OPEX_cycle * np.sum(result['From Battery'])
 OPEX_battery = 35 *0.93 *1.4e3   #Euro/kW-year
+
 lifetime = 30
 OPEX_sum = 0
 energy_sum = 0
 r = 0.07
-charge_efficiency = 0.6747
+#charge_efficiency = 0.6747
+charge_efficiency = 0.9
 discharge_efficiency = 0.2812
 
 for i in range(1, lifetime + 1):
@@ -64,19 +68,22 @@ CAPEX_HEX = 10083  # Euro/MW
 HEX_size = 5  # MW
 
 
-Wind_capacity = 4  # in MW
+ # in MW
 CAPEX_wind = 1.3e6  # Euro/MW
 OPEX_wind = 14.5  # Euro/MWh
 
-PV_capacity = 4  # in MW
+
+
+
 CAPEX_PV = 1.01 * 0.93 * 1e6  # Euro/MW
 OPEX_PV = 17 * 0.93 # Euro/kW-Year
 
-CAPEX_Li = 564*0.93*1e3   #Euro/MWh
-Size_Li = 8.4 #MWh
-#Total_CAPEX = CAPEX_wind * Wind_capacity + CAPEX_PV * PV_capacity + CAPEX_heater * heater_size + CAPEX_pipe * size + CAPEX_HEX * HEX_size + CAPEX_battery
 
-Total_CAPEX = CAPEX_wind * Wind_capacity + CAPEX_PV * PV_capacity + 2*CAPEX_battery
+#CAPEX_Li = 564*0.93*1e3   #Euro/MWh
+#Size_Li = 10 #MWh
+#Total_CAPEX = CAPEX_wind * Wind_capacity + CAPEX_PV * PV_capacity + (CAPEX_heater * heater_size + CAPEX_pipe * size + CAPEX_HEX * HEX_size + CAPEX_battery)
+
+Total_CAPEX = CAPEX_wind * Wind_capacity + CAPEX_PV * PV_capacity + CAPEX_battery
 
 Total_OPEX = OPEX_wind * np.sum(result['Wind']) + OPEX_PV*PV_capacity*1000 + np.sum(result['From Grid'] * result['Grid Price']) + OPEX_battery
 
@@ -129,5 +136,20 @@ for i in range(n_days):
 plt.plot(battery_utilization)
 
 print('The average battery utilization is {} %'.format(np.average(battery_utilization)*100))
+
+
+
+print('CAPEX of PV is', CAPEX_PV * PV_capacity)
+print('Wind CAPEX is', Wind_capacity*CAPEX_wind)
+print('CAPEX of Battery is',CAPEX_battery)
+#print('CAPEX of Heater is', CAPEX_heater*heater_size)
+#print('CAPEX for pipe is', CAPEX_pipe * size )
+#print('CAPEX for HEX is',CAPEX_HEX * HEX_size )
+
+print('OPEX of PV is',OPEX_PV*PV_capacity*1000)
+print('Wind OPEX is', OPEX_wind * np.sum(result['Wind']))
+print('OPEX of battery is', OPEX_battery)
+print('OPEX of Grid Import is', np.sum(result['From Grid'] * result['Grid Price']) )
+
 #plt.show()
 #.apply(lambda x: (x-x.iloc[0])/x.iloc[0]*100).reset_index(0, drop=True)

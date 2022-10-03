@@ -33,7 +33,7 @@ def weekly_dispatcher(PV_power, Wind_power, load_profile, grid_price, SOC_ini):
     SOC_max = 0.9
     SOC_min = 0.3
     #battery capacity is 30 MWh
-    battery_capacity = 30
+    battery_capacity = 60
     #PV_capacity = 0.2  #MW
 
     constraints = []
@@ -58,8 +58,8 @@ def weekly_dispatcher(PV_power, Wind_power, load_profile, grid_price, SOC_ini):
         constraints += [power_fromgrid[t] >= -30*(1-l2[t]), power_fromgrid[t] <= 30*l2[t]]
         constraints += [power_toGrid[t] <= 30*(1-l2[t]), power_toGrid[t] >= -30*(1-l2[t])]
 
-        constraints += [power_frombattery[t] >= -10 * (1 - l3[t]), power_frombattery[t] <= 10 * l3[t]]
-        constraints += [power_tobattery[t] <= 10 * (1 - l3[t]), power_tobattery[t] >= -10 * (1 - l3[t])]
+        constraints += [power_frombattery[t] >= -20 * (1 - l3[t]), power_frombattery[t] <= 20 * l3[t]]
+        constraints += [power_tobattery[t] <= 20 * (1 - l3[t]), power_tobattery[t] >= -20 * (1 - l3[t])]
 
 
 
@@ -85,6 +85,10 @@ def weekly_dispatcher(PV_power, Wind_power, load_profile, grid_price, SOC_ini):
             constraints += [
                 SOC[t] == SOC_ini+ 0.6747 * power_tobattery[t] / battery_capacity - power_frombattery[t] / (
                             0.2817 * battery_capacity)]
+           # constraints += [
+            #    SOC[t] == SOC_ini + 0.90 * power_tobattery[t] / battery_capacity - power_frombattery[t] / (
+             #           0.90 * battery_capacity)]
+
             #constraints += [step_efficiency[t] == -0.6037 * SOC_ini + 1.098]
             #constraints += [product[t] <= (SOC_max - SOC_ini)*battery_capacity]
             #constraints += [power_frombattery[t]/0.2817 <= (SOC_ini - SOC_min)*battery_capacity]
@@ -101,6 +105,10 @@ def weekly_dispatcher(PV_power, Wind_power, load_profile, grid_price, SOC_ini):
             #constraints += [step_efficiency[t] >= 0.8404 - 10 * l1[t]]
 
             constraints += [SOC[t] == SOC[t - 1] + 0.6747*power_tobattery[t] / battery_capacity -  power_frombattery[t] / (0.2817*battery_capacity)]
+            #constraints += [
+             #   SOC[t] == SOC[t - 1] + 0.90 * power_tobattery[t] / battery_capacity - power_frombattery[t] / (
+              #              0.90 * battery_capacity)]
+
             #constraints += [product[t] <= (SOC_max - SOC[t-1]) * battery_capacity]
            # constraints += [power_frombattery[t]/0.2817 <= (SOC[t-1] - SOC_min) * battery_capacity]
     #cost += PV_opcost*PV_capacity + CAPEX_battery*0.02
