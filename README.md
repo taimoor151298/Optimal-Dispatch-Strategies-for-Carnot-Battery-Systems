@@ -1,4 +1,4 @@
-# Dispatch_Stragies_Code_File
+# Optimal Dispatch Strategies for Carnot Battery Systems
 
 ## Setup
 - Only download the .csv files alongwith `yearly_dispatcher.py` and `weekly_dispatcher.py`
